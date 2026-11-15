@@ -4,124 +4,42 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Register - Teamwork LLM</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      background: #0f172a;
-      color: #f8fafc;
-      min-height: 100vh;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      padding: 1rem;
-    }
-    .card {
-      background: #1e293b;
-      border: 1px solid #334155;
-      border-radius: 12px;
-      width: 100%;
-      max-width: 420px;
-      padding: 2rem;
-    }
-    h1 {
-      font-size: 1.5rem;
-      margin-bottom: 0.5rem;
-      text-align: center;
-    }
-    p.subtitle {
-      color: #94a3b8;
-      font-size: 0.9rem;
-      text-align: center;
-      margin-bottom: 1.5rem;
-    }
-    .form-group { margin-bottom: 1rem; }
-    label {
-      display: block;
-      font-size: 0.85rem;
-      color: #cbd5e1;
-      margin-bottom: 0.4rem;
-    }
-    input {
-      width: 100%;
-      padding: 0.65rem 0.85rem;
-      border-radius: 6px;
-      border: 1px solid #475569;
-      background: #0f172a;
-      color: #f8fafc;
-      font-size: 0.95rem;
-    }
-    input:focus {
-      outline: none;
-      border-color: #38bdf8;
-    }
-    button {
-      width: 100%;
-      padding: 0.75rem;
-      margin-top: 0.5rem;
-      background: #0284c7;
-      color: #fff;
-      border: none;
-      border-radius: 6px;
-      font-size: 1rem;
-      font-weight: 600;
-      cursor: pointer;
-    }
-    button:hover { background: #0369a1; }
-    button:disabled { opacity: 0.6; cursor: not-allowed; }
-    .error {
-      background: rgba(239, 68, 68, 0.15);
-      border: 1px solid #ef4444;
-      color: #fca5a5;
-      padding: 0.65rem;
-      border-radius: 6px;
-      font-size: 0.85rem;
-      margin-bottom: 1rem;
-      display: none;
-    }
-    .footer-links {
-      margin-top: 1.25rem;
-      text-align: center;
-      font-size: 0.9rem;
-      color: #94a3b8;
-    }
-    .footer-links a {
-      color: #38bdf8;
-      text-decoration: none;
-    }
-    .footer-links a:hover { text-decoration: underline; }
-  </style>
+  <link rel="stylesheet" href="/static/styles.css" />
 </head>
 <body>
-  <div class="card">
-    <h1>Create Account</h1>
-    <p class="subtitle">Join Teamwork LLM</p>
+  <div class="page">
+    <main class="centered">
+      <div class="card">
+        <h1 class="card-title">Create Account</h1>
+        <p class="card-subtitle">Join Teamwork LLM</p>
 
-    <div id="error-box" class="error"></div>
+        <div id="error-box" class="alert-error"></div>
 
-    <form id="register-form">
-      <div class="form-group">
-        <label for="username">Username</label>
-        <input type="text" id="username" required maxlength="50" placeholder="johndoe" />
-      </div>
-      <div class="form-group">
-        <label for="display_name">Display Name</label>
-        <input type="text" id="display_name" required maxlength="100" placeholder="John Doe" />
-      </div>
-      <div class="form-group">
-        <label for="email">Email</label>
-        <input type="email" id="email" required placeholder="you@example.com" />
-      </div>
-      <div class="form-group">
-        <label for="password">Password</label>
-        <input type="password" id="password" required placeholder="••••••••" />
-      </div>
-      <button type="submit" id="submit-btn">Register</button>
-    </form>
+        <form id="register-form">
+          <div class="form-group">
+            <label class="form-label" for="username">Username</label>
+            <input class="input" type="text" id="username" required maxlength="50" placeholder="johndoe" />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="display_name">Display Name</label>
+            <input class="input" type="text" id="display_name" required maxlength="100" placeholder="John Doe" />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="email">Email</label>
+            <input class="input" type="email" id="email" required placeholder="you@example.com" />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="password">Password</label>
+            <input class="input" type="password" id="password" required placeholder="••••••••" />
+          </div>
+          <button type="submit" class="btn btn-primary btn-block btn-lg" id="submit-btn">Register</button>
+        </form>
 
-    <div class="footer-links">
-      Already have an account? <a href="/login">Sign In</a> &middot; <a href="/">Home</a>
-    </div>
+        <div class="form-footer">
+          Already have an account? <a href="/login">Sign In</a> &middot; <a href="/">Home</a>
+        </div>
+      </div>
+    </main>
   </div>
 
   <script>

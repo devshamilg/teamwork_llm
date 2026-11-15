@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Chat - Teamwork LLM</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <div class="page-fixed">
+    <header class="topbar">
+      <div class="topbar-left">
+        <a href="/home" class="back-link" title="Back to rooms">&larr;</a>
+        <div class="avatar avatar-sm" id="room-avatar">#</div>
+        <div style="min-width:0;">
+          <div class="chat-title" id="room-name">Loading room...</div>
+          <div class="chat-status">
+            <span class="status-dot" id="ws-indicator"></span>
+            <span id="ws-status-text">Connecting...</span>
+          </div>
+        </div>
+      </div>
+      <div class="topbar-right">
+        <div class="dropdown-wrapper">
+          <button class="btn btn-secondary" id="invite-btn" type="button">+ Invite Member</button>
+          <div class="dropdown-menu" id="invite-menu" style="width: 290px;">
+            <div class="dropdown-title">Invite Member</div>
+            <form id="invite-form">
+              <input
+                class="input"
+                type="text"
+                id="invite-input"
+                placeholder="Username or email..."
+                required
+                style="margin-bottom: 0.6rem;"
+              />
+              <div id="invite-feedback" style="font-size: 0.8rem; margin-bottom: 0.6rem; display: none;"></div>
+              <button type="submit" class="btn btn-primary btn-block" id="send-invite-btn">Send Invite</button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="messages" id="chat-container">
+      <div class="messages-empty" id="chat-status">Loading conversation...</div>
+    </main>
+
+    <footer class="composer">
+      <form class="composer-form" id="chat-form">
+        <input
+          type="text"
+          id="message-input"
+          class="composer-input"
+          placeholder="Type your message..."
+          autocomplete="off"
+          required
+        />
+        <button type="submit" class="icon-btn" id="send-btn" title="Send">
+          <svg viewBox="0 0 24 24"><path d="M2.01 21 23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+        </button>
+      </form>
+    </footer>
+  </div>
+
+  <script>
+    const token = localStorage.getItem("access_token");
+    if (!token) {
+      window.location.href = "/login";
+    }
+
+    const authHeaders = {
+      "Authorization": `Bearer ${token}`,
+      "Content-Type": "application/json",
+    };
+
+    // Extract room_id from /rooms/{room_id}
+    const pathParts = window.location.pathname.split("/").filter(Boolean);
+    const roomId = pathParts[pathParts.length - 1];
+
+    let currentUserId = null;
+    let messageIds = new Set();
+    let socket = null;
+
+    function initials(name) {
+      return (name || "?")
+        .split(/\s+/)
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((w) => w[0])
+        .join("");
+    }
+
+    async function init() {
+      try {
+        // 1. Load authenticated user
+        const meRes = await fetch("/api/me", { headers: authHeaders });
+        if (meRes.status === 401) {
+          localStorage.removeItem("access_token");
+          window.location.href = "/login";
+          return;
+        }
+        const me = await meRes.json();
+        currentUserId = me.id;
+
+        // 2. Load room info
+        const roomRes = await fetch(`/api/rooms/${roomId}`, { headers: authHeaders });
+        if (!roomRes.ok) {
+          document.getElementById("room-name").textContent = "Room unavailable";
+          document.getElementById("chat-status").textContent = "Room not found or you don't have access.";
+          setConnectionStatus("disconnected", "Unavailable");
+          return;
+        }
+        const room = await roomRes.json();
+        document.getElementById("room-name").textContent = room.name;
+        document.getElementById("room-avatar").textContent = initials(room.name);
+        document.title = `${room.name} - Teamwork LLM`;
+
+        // 3. Load message history
+        await fetchMessages();
+
+        // 4. Connect to real-time WebSocket
+        connectWebSocket();
+      } catch (err) {
+        console.error("Init failed:", err);
+      }
+    }
+
+    function setConnectionStatus(status, label) {
+      const dot = document.getElementById("ws-indicator");
+      const text = document.getElementById("ws-status-text");
+      dot.classList.remove("connected", "disconnected");
+      if (status === "connected") {
+        dot.classList.add("connected");
+        text.textContent = label || "Online";
+      } else if (status === "connecting") {
+        text.textContent = label || "Connecting...";
+      } else {
+        dot.classList.add("disconnected");
+        text.textContent = label || "Reconnecting...";
+      }
+    }
+
+    function connectWebSocket() {
+      const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+      const wsUrl = `${wsProtocol}//${window.location.host}/api/ws/rooms/${roomId}?token=${encodeURIComponent(token)}`;
+
+      setConnectionStatus("connecting");
+      socket = new WebSocket(wsUrl);
+
+      socket.onopen = () => {
+        setConnectionStatus("connected");
+      };
+
+      socket.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+          appendMessage(msg);
+        } catch (err) {
+          console.error("Error parsing WebSocket message:", err);
+        }
+      };
+
+      socket.onclose = (event) => {
+        // Reconnect after 3s unless intentional policy violation (e.g. invalid token or access denied)
+        if (event.code !== 1008) {
+          setConnectionStatus("disconnected");
+          setTimeout(connectWebSocket, 3000);
+        } else {
+          setConnectionStatus("disconnected", "Disconnected");
+        }
+      };
+
+      socket.onerror = (err) => {
+        console.error("WebSocket error:", err);
+      };
+    }
+
+    function formatTime(isoString) {
+      if (!isoString) return "";
+      const date = new Date(isoString);
+      return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    }
+
+    function renderMessage(msg) {
+      const row = document.createElement("div");
+      const isMine = msg.sender_id && currentUserId && msg.sender_id === currentUserId;
+
+      if (msg.sender_type === "system") {
+        row.className = "message-row system";
+      } else if (isMine) {
+        row.className = "message-row mine";
+      } else if (msg.sender_type === "assistant") {
+        row.className = "message-row theirs assistant";
+      } else {
+        row.className = "message-row theirs";
+      }
+
+      if (msg.sender_type !== "system" && !isMine) {
+        const title = document.createElement("div");
+        title.className = "sender-title";
+        title.textContent = msg.sender_name + (msg.sender_username ? ` (@${msg.sender_username})` : "");
+        row.appendChild(title);
+      }
+
+      const bubble = document.createElement("div");
+      bubble.className = "message-bubble";
+      bubble.textContent = msg.content;
+
+      if (msg.created_at) {
+        const timeDiv = document.createElement("div");
+        timeDiv.className = "message-time";
+        timeDiv.textContent = formatTime(msg.created_at);
+        bubble.appendChild(timeDiv);
+      }
+
+      row.appendChild(bubble);
+      return row;
+    }
+
+    function appendMessage(msg) {
+      if (!msg || !msg.id || messageIds.has(msg.id)) return;
+      messageIds.add(msg.id);
+
+      const container = document.getElementById("chat-container");
+      const statusEl = document.getElementById("chat-status");
+      if (statusEl) {
+        statusEl.remove();
+      }
+
+      container.appendChild(renderMessage(msg));
+      container.scrollTop = container.scrollHeight;
+    }
+
+    async function fetchMessages() {
+      try {
+        const res = await fetch(`/api/rooms/${roomId}/messages`, { headers: authHeaders });
+        if (!res.ok) return;
+
+        const messages = await res.json();
+        const container = document.getElementById("chat-container");
+        const statusEl = document.getElementById("chat-status");
+
+        if (messages.length === 0) {
+          if (statusEl) {
+            statusEl.textContent = "No messages yet. Start the conversation!";
+          }
+          return;
+        }
+
+        if (statusEl) {
+          statusEl.remove();
+        }
+
+        messages.forEach((msg) => {
+          if (!messageIds.has(msg.id)) {
+            messageIds.add(msg.id);
+            container.appendChild(renderMessage(msg));
+          }
+        });
+
+        container.scrollTop = container.scrollHeight;
+      } catch (err) {
+        console.error("Failed to fetch messages:", err);
+      }
+    }
+
+    // Message submit handler
+    document.getElementById("chat-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const input = document.getElementById("message-input");
+      const sendBtn = document.getElementById("send-btn");
+      const content = input.value.trim();
+      if (!content) return;
+
+      input.value = "";
+      sendBtn.disabled = true;
+
+      if (socket && socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify({ content }));
+        sendBtn.disabled = false;
+        input.focus();
+      } else {
+        // Fallback to HTTP POST if WebSocket is disconnected
+        try {
+          const res = await fetch(`/api/rooms/${roomId}/messages`, {
+            method: "POST",
+            headers: authHeaders,
+            body: JSON.stringify({ content }),
+          });
+
+          if (res.ok) {
+            const newMsg = await res.json();
+            appendMessage(newMsg);
+          } else {
+            const errData = await res.json().catch(() => ({}));
+            alert(errData.detail || "Failed to send message");
+          }
+        } catch (err) {
+          console.error("Failed to send message via HTTP fallback:", err);
+        } finally {
+          sendBtn.disabled = false;
+          input.focus();
+        }
+      }
+    });
+
+    // Invite member dropdown toggle
+    const inviteBtn = document.getElementById("invite-btn");
+    const inviteMenu = document.getElementById("invite-menu");
+    const inviteForm = document.getElementById("invite-form");
+    const inviteInput = document.getElementById("invite-input");
+    const inviteFeedback = document.getElementById("invite-feedback");
+    const sendInviteBtn = document.getElementById("send-invite-btn");
+
+    inviteBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      inviteMenu.classList.toggle("show");
+      if (inviteMenu.classList.contains("show")) {
+        inviteInput.focus();
+      }
+    });
+
+    inviteMenu.addEventListener("click", (e) => {
+      e.stopPropagation();
+    });
+
+    document.addEventListener("click", () => {
+      inviteMenu.classList.remove("show");
+    });
+
+    inviteForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const identifier = inviteInput.value.trim();
+      if (!identifier) return;
+
+      sendInviteBtn.disabled = true;
+      inviteFeedback.style.display = "none";
+
+      try {
+        const res = await fetch(`/api/rooms/${roomId}/invitations`, {
+          method: "POST",
+          headers: authHeaders,
+          body: JSON.stringify({ identifier }),
+        });
+
+        const data = await res.json();
+        if (res.ok) {
+          inviteFeedback.style.color = "var(--success)";
+          inviteFeedback.textContent = data.message || "Invitation sent!";
+          inviteFeedback.style.display = "block";
+          inviteInput.value = "";
+          setTimeout(() => {
+            inviteMenu.classList.remove("show");
+            inviteFeedback.style.display = "none";
+          }, 1600);
+        } else {
+          inviteFeedback.style.color = "var(--danger)";
+          inviteFeedback.textContent = data.detail || "Failed to invite user.";
+          inviteFeedback.style.display = "block";
+        }
+      } catch (err) {
+        inviteFeedback.style.color = "var(--danger)";
+        inviteFeedback.textContent = "Error sending invitation.";
+        inviteFeedback.style.display = "block";
+      } finally {
+        sendInviteBtn.disabled = false;
+      }
+    });
+
+    init();
+  </script>
+</body>
+</html>

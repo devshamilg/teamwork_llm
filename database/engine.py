@@ -1,5 +1,13 @@
 import os
+import sys
+from types import ModuleType
 from typing import AsyncGenerator
+
+# Fallback for passlib's legacy import of pkg_resources in Python 3.12+
+try:
+    import pkg_resources
+except ImportError:
+    sys.modules["pkg_resources"] = ModuleType("pkg_resources")
 
 from dotenv import load_dotenv
 from fastapi import Depends

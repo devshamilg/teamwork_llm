@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>My Profile - Teamwork LLM</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <div class="page">
+    <header class="topbar">
+      <div class="topbar-left">
+        <a href="/home" class="back-link" title="Back to Rooms">&larr;</a>
+        <a href="/home" class="logo">Teamwork <span>LLM</span></a>
+      </div>
+      <div class="topbar-right">
+        <a href="/home" class="btn btn-ghost">Rooms</a>
+      </div>
+    </header>
+
+    <main class="centered">
+      <div class="card" style="max-width: 460px;">
+        <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1.5rem;">
+          <div class="avatar" id="avatar-initials" style="width: 56px; height: 56px; font-size: 1.25rem;">?</div>
+          <div>
+            <h1 class="card-title" id="profile-title" style="text-align: left; margin-bottom: 0.15rem;">Loading...</h1>
+            <p class="muted" id="profile-subtitle" style="font-size: 0.85rem;">@username</p>
+          </div>
+        </div>
+
+        <div id="success-box" class="alert-success"></div>
+        <div id="error-box" class="alert-error"></div>
+
+        <form id="profile-form">
+          <div class="form-group">
+            <label class="form-label" for="email">Email</label>
+            <input class="input" type="email" id="email" disabled style="opacity: 0.7; cursor: not-allowed;" />
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="username">Username</label>
+            <input class="input" type="text" id="username" disabled style="opacity: 0.7; cursor: not-allowed;" />
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="display_name">Display Name</label>
+            <input class="input" type="text" id="display_name" required maxlength="100" placeholder="Your name" />
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="bio">Bio</label>
+            <textarea
+              class="input"
+              id="bio"
+              rows="3"
+              placeholder="Tell your team about yourself..."
+              style="resize: vertical; font-family: inherit;"
+            ></textarea>
+          </div>
+
+          <button type="submit" class="btn btn-primary btn-block" id="save-btn" style="margin-top: 1.25rem;">
+            Save Changes
+          </button>
+        </form>
+
+        <div style="margin: 1.5rem 0 1rem; border-top: 1px solid var(--border);"></div>
+
+        <button
+          type="button"
+          class="btn btn-ghost btn-block"
+          id="logout-btn"
+          style="color: var(--danger); border-color: rgba(229, 72, 77, 0.4);"
+        >
+          Log Out
+        </button>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    const token = localStorage.getItem("access_token");
+    if (!token) {
+      window.location.href = "/login";
+    }
+
+    const authHeaders = {
+      "Authorization": `Bearer ${token}`,
+      "Content-Type": "application/json",
+    };
+
+    function initials(name) {
+      return (name || "?")
+        .split(/\s+/)
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((w) => w[0])
+        .join("");
+    }
+
+    async function loadProfile() {
+      try {
+        const res = await fetch("/api/me", { headers: authHeaders });
+        if (res.status === 401) {
+          localStorage.removeItem("access_token");
+          window.location.href = "/login";
+          return;
+        }
+
+        const user = await res.json();
+        document.getElementById("profile-title").textContent = user.display_name;
+        document.getElementById("profile-subtitle").textContent = `@${user.username}`;
+        document.getElementById("avatar-initials").textContent = initials(user.display_name);
+
+        document.getElementById("email").value = user.email || "";
+        document.getElementById("username").value = user.username || "";
+        document.getElementById("display_name").value = user.display_name || "";
+        document.getElementById("bio").value = user.bio || "";
+      } catch (err) {
+        console.error("Failed to load profile:", err);
+      }
+    }
+
+    const profileForm = document.getElementById("profile-form");
+    const saveBtn = document.getElementById("save-btn");
+    const successBox = document.getElementById("success-box");
+    const errorBox = document.getElementById("error-box");
+
+    profileForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      successBox.style.display = "none";
+      errorBox.style.display = "none";
+      saveBtn.disabled = true;
+      saveBtn.textContent = "Saving...";
+
+      const displayName = document.getElementById("display_name").value.trim();
+      const bio = document.getElementById("bio").value.trim();
+
+      try {
+        const res = await fetch("/api/me", {
+          method: "PATCH",
+          headers: authHeaders,
+          body: JSON.stringify({
+            display_name: displayName,
+            bio: bio || null,
+          }),
+        });
+
+        if (res.ok) {
+          const updated = await res.json();
+          document.getElementById("profile-title").textContent = updated.display_name;
+          document.getElementById("avatar-initials").textContent = initials(updated.display_name);
+          successBox.textContent = "Profile updated successfully!";
+          successBox.style.display = "block";
+        } else {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.detail || "Failed to update profile.");
+        }
+      } catch (err) {
+        errorBox.textContent = err.message;
+        errorBox.style.display = "block";
+      } finally {
+        saveBtn.disabled = false;
+        saveBtn.textContent = "Save Changes";
+      }
+    });
+
+    document.getElementById("logout-btn").addEventListener("click", async () => {
+      await fetch("/auth/jwt/logout", { method: "POST", headers: authHeaders }).catch(() => {});
+      localStorage.removeItem("access_token");
+      window.location.href = "/login";
+    });
+
+    loadProfile();
+  </script>
+</body>
+</html>

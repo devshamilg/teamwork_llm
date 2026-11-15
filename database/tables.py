@@ -137,6 +137,11 @@ class User(SQLAlchemyBaseUserTableUUID, Base):
         "Message",
         back_populates="sender",
     )
+    room_memberships: Mapped[List["RoomMember"]] = relationship(
+        "RoomMember",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
 
 
 class Room(Base):
@@ -199,6 +204,11 @@ class Room(Base):
         "User",
         back_populates="rooms_created",
     )
+    members: Mapped[List["RoomMember"]] = relationship(
+        "RoomMember",
+        back_populates="room",
+        cascade="all, delete-orphan",
+    )
     invitations: Mapped[List["RoomInvitation"]] = relationship(
         "RoomInvitation",
         back_populates="room",
@@ -213,6 +223,49 @@ class Room(Base):
         "RoomSummary",
         back_populates="room",
         cascade="all, delete-orphan",
+    )
+
+
+class RoomMember(Base):
+    __tablename__ = "room_members"
+    __table_args__ = (
+        UniqueConstraint("room_id", "user_id", name="uq_room_members_room_user"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+        server_default=func.gen_random_uuid(),
+    )
+    room_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("rooms.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    role: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        default="member",
+        server_default=text("'member'"),
+    )
+    joined_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
+
+    # Relationships
+    room: Mapped["Room"] = relationship(
+        "Room",
+        back_populates="members",
+    )
+    user: Mapped["User"] = relationship(
+        "User",
+        back_populates="room_memberships",
     )
 
 
@@ -431,6 +484,7 @@ __all__ = [
     "Base",
     "User",
     "Room",
+    "RoomMember",
     "RoomInvitation",
     "Message",
     "RoomSummary",
