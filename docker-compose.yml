@@ -1,0 +1,45 @@
+services:
+  postgres:
+    image: postgres:18
+    container_name: teamwork_llm_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-user123}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-wX/<4720}
+      POSTGRES_DB: ${DB_NAME:-teamwork_llm_db}
+    ports:
+      - "${DB_PORT:-5434}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-user123} -d ${DB_NAME:-teamwork_llm_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: teamwork_llm_web
+    restart: unless-stopped
+    command: uvicorn main:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8000:8000"
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=${DB_USER:-user123}
+      - DB_PASSWORD=${DB_PASSWORD:-wX/<4720}
+      - DB_NAME=${DB_NAME:-teamwork_llm_db}
+      - SECRET_KEY=${SECRET_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_MODEL=${OPENAI_MODEL}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+
+volumes:
+  postgres_data:
+
