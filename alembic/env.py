@@ -13,18 +13,12 @@ from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 
 from alembic import context
-from database.engine import DATABASE_URL, TEST_DATABASE_URL, engine, test_engine
+from database.engine import DATABASE_URL, engine
 from database.tables import Base
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
-
-# Check if targeting test database via -x db=test or environment variable
-x_args = context.get_x_argument(as_dictionary=True)
-if x_args.get("db") == "test":
-    DATABASE_URL = TEST_DATABASE_URL
-    engine = test_engine
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
