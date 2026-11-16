@@ -24,9 +24,11 @@ async def register_page():
     return FileResponse(TEMPLATES_DIR / "register.html")
 
 
+@router.get("/chat")
 @router.get("/home")
+@router.get("/rooms")
 async def home_page():
-    return FileResponse(TEMPLATES_DIR / "home.html")
+    return FileResponse(TEMPLATES_DIR / "chat.html")
 
 
 @router.get("/rooms/{room_id}")

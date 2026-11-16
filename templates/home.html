@@ -3,45 +3,161 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>My Rooms - Teamwork LLM</title>
+  <title>Chats - Teamwork LLM</title>
   <link rel="stylesheet" href="/static/styles.css" />
 </head>
 <body>
-  <div class="page">
-    <header class="topbar">
-      <a href="/" class="logo">Teamwork <span>LLM</span></a>
-      <div class="topbar-right">
-        <div class="dropdown-wrapper">
-          <button class="btn btn-ghost" id="notif-btn" type="button" title="Notifications" style="position:relative; font-size:1rem; padding:0.5rem 0.75rem;">
-            🔔 <span id="notif-badge" class="notification-badge hidden">0</span>
-          </button>
-          <div class="dropdown-menu" id="notif-menu" style="width: 320px; max-height: 380px; overflow-y: auto;">
-            <div class="dropdown-title">Notifications</div>
-            <div id="notif-list">
-              <div class="muted" style="font-size: 0.85rem; text-align: center; padding: 1rem 0;">No notifications</div>
+  <div class="app-layout">
+    <!-- LEFT SIDEBAR: Rooms List & Actions -->
+    <aside class="sidebar" id="sidebar">
+      <header class="sidebar-header">
+        <div class="sidebar-header-top">
+          <a href="/" class="logo">Teamwork <span>LLM</span></a>
+          <div class="sidebar-actions">
+            <!-- Notifications Dropdown (opens to the right) -->
+            <div class="dropdown-wrapper">
+              <button class="btn-icon-ghost" id="notif-btn" type="button" title="Notifications">
+                🔔 <span id="notif-badge" class="notification-badge hidden">0</span>
+              </button>
+              <div class="dropdown-menu drop-right" id="notif-menu" style="width: 300px; max-height: 380px; overflow-y: auto;">
+                <div class="dropdown-title">Notifications</div>
+                <div id="notif-list">
+                  <div class="muted" style="font-size:0.85rem; text-align:center; padding:1rem 0;">No notifications</div>
+                </div>
+              </div>
             </div>
+
+            <!-- Profile Link -->
+            <a href="/profile" class="btn-icon-ghost" title="My Profile">👤</a>
+
+            <!-- + New Room Toggle -->
+            <button class="btn btn-primary btn-sm" id="toggle-create-btn" type="button">+ New</button>
           </div>
         </div>
-        <a href="/profile" class="btn btn-secondary" id="profile-btn">Profile</a>
-      </div>
-    </header>
 
-    <main class="container">
-      <div class="section-head">
-        <h1 class="section-title">Rooms</h1>
-        <button class="btn btn-primary" id="toggle-create-btn">+ New Room</button>
+        <!-- Collapsible Create Room Box -->
+        <div class="create-room-panel hidden" id="create-room-box">
+          <form id="create-room-form">
+            <input
+              class="input"
+              type="text"
+              id="room-name-input"
+              required
+              maxlength="100"
+              placeholder="Room name..."
+              style="margin-bottom: 0.5rem;"
+            />
+            <input
+              class="input"
+              type="text"
+              id="room-desc-input"
+              placeholder="Description (optional)..."
+              style="margin-bottom: 0.6rem;"
+            />
+            <div style="display:flex; justify-content:flex-end; gap:0.5rem;">
+              <button type="button" class="btn btn-ghost btn-sm" id="cancel-create-btn">Cancel</button>
+              <button type="submit" class="btn btn-primary btn-sm" id="submit-create-btn">Create</button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Search Rooms Input -->
+        <div class="sidebar-search">
+          <input
+            class="input sidebar-search-input"
+            type="text"
+            id="search-rooms-input"
+            placeholder="Search chats..."
+            autocomplete="off"
+          />
+        </div>
+      </header>
+
+      <!-- Scrollable Rooms List -->
+      <div class="sidebar-rooms" id="rooms-container">
+        <p class="muted" style="text-align:center; padding:1.5rem 0;">Loading chats...</p>
+      </div>
+    </aside>
+
+    <!-- RIGHT MAIN: Active Chat or Empty Placeholder -->
+    <main class="chat-main" id="chat-main">
+      <!-- Active Conversation View -->
+      <div class="chat-view hidden" id="active-chat-view">
+        <header class="topbar chat-header">
+          <div class="topbar-left">
+            <button class="back-link mobile-only" id="back-to-sidebar-btn" title="Back to chats">&larr;</button>
+            <div class="avatar avatar-sm" id="room-avatar">#</div>
+            <div style="min-width:0;">
+              <div class="chat-title" id="room-name">Loading room...</div>
+              <div class="chat-status">
+                <span class="status-dot" id="ws-indicator"></span>
+                <span id="ws-status-text">Connecting...</span>
+              </div>
+            </div>
+          </div>
+          <div class="topbar-right">
+            <!-- Members & Invite Dropdown -->
+            <div class="dropdown-wrapper">
+              <button class="btn btn-secondary btn-sm" id="members-btn" type="button">
+                👥 Members <span class="members-count-badge" id="members-count">0</span>
+              </button>
+              <div class="dropdown-menu" id="members-menu" style="width: 320px;">
+                <div class="dropdown-title">Room Members</div>
+                <div class="members-list" id="members-list">
+                  <div class="muted" style="font-size: 0.85rem; text-align: center; padding: 0.5rem 0;">Loading members...</div>
+                </div>
+
+                <div class="dropdown-divider"></div>
+
+                <div class="dropdown-title" style="border-bottom: none; margin-bottom: 0.45rem; padding-bottom: 0;">Invite Member</div>
+                <form id="invite-form">
+                  <input
+                    class="input"
+                    type="text"
+                    id="invite-input"
+                    placeholder="Username or email..."
+                    required
+                    style="margin-bottom: 0.5rem;"
+                  />
+                  <div id="invite-feedback" style="font-size: 0.8rem; margin-bottom: 0.5rem; display: none;"></div>
+                  <button type="submit" class="btn btn-primary btn-block btn-sm" id="send-invite-btn">+ Send Invite</button>
+                </form>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <div class="messages" id="chat-container">
+          <div class="messages-empty" id="chat-status">Loading conversation...</div>
+        </div>
+
+        <footer class="composer">
+          <form class="composer-form" id="chat-form">
+            <input
+              type="text"
+              id="message-input"
+              class="composer-input"
+              placeholder="Type @AI to request something from AI"
+              autocomplete="off"
+              required
+            />
+            <button type="submit" class="icon-btn" id="send-btn" title="Send">
+              <svg viewBox="0 0 24 24"><path d="M2.01 21 23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+            </button>
+          </form>
+        </footer>
       </div>
 
-      <div class="panel hidden" id="create-room-box">
-        <form class="inline-form" id="create-room-form">
-          <input class="input" type="text" id="room-name" required maxlength="100" placeholder="Room name" />
-          <input class="input" type="text" id="room-desc" placeholder="Description (optional)" />
-          <button type="submit" class="btn btn-primary">Create</button>
-        </form>
-      </div>
-
-      <div id="rooms-container">
-        <p class="muted">Loading rooms...</p>
+      <!-- Placeholder View (No conversation selected) -->
+      <div class="chat-placeholder" id="empty-chat-placeholder">
+        <div class="placeholder-content">
+          <div class="placeholder-icon">💬</div>
+          <h2>Select a conversation</h2>
+          <p class="muted">
+            Choose a chat from the sidebar on the left or create a new room to collaborate with your team and AI.
+          </p>
+          <button class="btn btn-primary" id="placeholder-create-btn" type="button">+ Create New Room</button>
+        </div>
       </div>
     </main>
   </div>
@@ -57,6 +173,12 @@
       "Content-Type": "application/json",
     };
 
+    let currentUserId = null;
+    let currentRoomId = null;
+    let cachedRooms = [];
+    let messageIds = new Set();
+    let socket = null;
+
     function initials(name) {
       return (name || "?")
         .split(/\s+/)
@@ -66,24 +188,297 @@
         .join("");
     }
 
-    async function loadUserAndRooms() {
+    function escapeHtml(text) {
+      const div = document.createElement("div");
+      div.textContent = text || "";
+      return div.innerHTML;
+    }
+
+    function formatTime(isoString) {
+      if (!isoString) return "";
+      const date = new Date(isoString);
+      return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    }
+
+    function setConnectionStatus(status, label) {
+      const dot = document.getElementById("ws-indicator");
+      const text = document.getElementById("ws-status-text");
+      if (!dot || !text) return;
+      dot.classList.remove("connected", "disconnected");
+      if (status === "connected") {
+        dot.classList.add("connected");
+        text.textContent = label || "Online";
+      } else if (status === "connecting") {
+        text.textContent = label || "Connecting...";
+      } else {
+        dot.classList.add("disconnected");
+        text.textContent = label || "Disconnected";
+      }
+    }
+
+    function renderMessage(msg) {
+      const row = document.createElement("div");
+      const isMine = msg.sender_id && currentUserId && msg.sender_id === currentUserId;
+
+      if (msg.sender_type === "system") {
+        row.className = "message-row system";
+      } else if (isMine) {
+        row.className = "message-row mine";
+      } else if (msg.sender_type === "assistant") {
+        row.className = "message-row theirs assistant";
+      } else {
+        row.className = "message-row theirs";
+      }
+
+      if (msg.sender_type !== "system" && !isMine) {
+        const title = document.createElement("div");
+        title.className = "sender-title";
+        title.textContent = msg.sender_name + (msg.sender_username ? ` (@${msg.sender_username})` : "");
+        row.appendChild(title);
+      }
+
+      const bubble = document.createElement("div");
+      bubble.className = "message-bubble";
+      bubble.textContent = msg.content;
+
+      if (msg.created_at) {
+        const timeDiv = document.createElement("div");
+        timeDiv.className = "message-time";
+        timeDiv.textContent = formatTime(msg.created_at);
+        bubble.appendChild(timeDiv);
+      }
+
+      row.appendChild(bubble);
+      return row;
+    }
+
+    function appendMessage(msg) {
+      if (!msg || !msg.id || messageIds.has(msg.id)) return;
+      messageIds.add(msg.id);
+
+      const container = document.getElementById("chat-container");
+      const statusEl = document.getElementById("chat-status");
+      if (statusEl) {
+        statusEl.remove();
+      }
+
+      container.appendChild(renderMessage(msg));
+      container.scrollTop = container.scrollHeight;
+    }
+
+    async function fetchMessages(roomId) {
       try {
-        const meRes = await fetch("/api/me", { headers: authHeaders });
-        if (meRes.status === 401) {
-          localStorage.removeItem("access_token");
-          window.location.href = "/login";
+        const res = await fetch(`/api/rooms/${roomId}/messages`, { headers: authHeaders });
+        if (!res.ok) return;
+
+        const messages = await res.json();
+        const container = document.getElementById("chat-container");
+        const statusEl = document.getElementById("chat-status");
+
+        if (messages.length === 0) {
+          if (statusEl) {
+            statusEl.textContent = "No messages yet. Start the conversation!";
+          }
           return;
         }
 
-        const roomsRes = await fetch("/api/rooms", { headers: authHeaders });
-        const rooms = await roomsRes.json();
-        renderRooms(rooms);
+        if (statusEl) {
+          statusEl.remove();
+        }
 
-        loadNotifications();
+        messages.forEach((msg) => {
+          if (!messageIds.has(msg.id)) {
+            messageIds.add(msg.id);
+            container.appendChild(renderMessage(msg));
+          }
+        });
+
+        container.scrollTop = container.scrollHeight;
+      } catch (err) {
+        console.error("Failed to fetch messages:", err);
+      }
+    }
+
+    async function loadRoomMembers(roomId) {
+      const listEl = document.getElementById("members-list");
+      const countEl = document.getElementById("members-count");
+      try {
+        const res = await fetch(`/api/rooms/${roomId}/members`, { headers: authHeaders });
+        if (!res.ok) return;
+        const members = await res.json();
+
+        countEl.textContent = members.length;
+
+        if (members.length === 0) {
+          listEl.innerHTML = `<div class="muted" style="font-size: 0.85rem; text-align: center; padding: 0.5rem 0;">No members found</div>`;
+          return;
+        }
+
+        listEl.innerHTML = members.map((m) => {
+          const isMe = m.id === currentUserId;
+          const roleLabel = m.role === "owner" ? "Owner" : "Member";
+          return `
+            <div class="member-item">
+              <div class="avatar avatar-xs">${escapeHtml(initials(m.display_name))}</div>
+              <div class="member-info">
+                <div class="member-name">${escapeHtml(m.display_name)}${isMe ? " (You)" : ""}</div>
+                <div class="member-username">@${escapeHtml(m.username)}</div>
+              </div>
+              <span class="tag">${escapeHtml(roleLabel)}</span>
+            </div>
+          `;
+        }).join("");
+      } catch (err) {
+        console.error("Failed to load room members:", err);
+      }
+    }
+
+    function connectWebSocket(roomId) {
+      if (socket) {
+        socket.onclose = null;
+        socket.close();
+        socket = null;
+      }
+
+      const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+      const wsUrl = `${wsProtocol}//${window.location.host}/api/ws/rooms/${roomId}?token=${encodeURIComponent(token)}`;
+
+      setConnectionStatus("connecting");
+      socket = new WebSocket(wsUrl);
+
+      socket.onopen = () => {
+        setConnectionStatus("connected");
+      };
+
+      socket.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+          appendMessage(msg);
+        } catch (err) {
+          console.error("Error parsing WebSocket message:", err);
+        }
+      };
+
+      socket.onclose = (event) => {
+        if (event.code !== 1000 && event.code !== 1008 && currentRoomId === roomId) {
+          setConnectionStatus("disconnected", "Reconnecting...");
+          setTimeout(() => {
+            if (currentRoomId === roomId) {
+              connectWebSocket(roomId);
+            }
+          }, 3000);
+        } else {
+          setConnectionStatus("disconnected", "Disconnected");
+        }
+      };
+
+      socket.onerror = (err) => {
+        console.error("WebSocket error:", err);
+      };
+    }
+
+    async function selectRoom(roomId, pushState = true) {
+      if (!roomId) return;
+      currentRoomId = roomId;
+
+      if (pushState) {
+        history.pushState({ roomId }, "", `/rooms/${roomId}`);
+      }
+
+      // Update sidebar active selection
+      document.querySelectorAll(".room-item").forEach((el) => {
+        if (el.dataset.roomId === roomId) {
+          el.classList.add("active");
+        } else {
+          el.classList.remove("active");
+        }
+      });
+
+      // Show active chat view, hide placeholder
+      document.getElementById("empty-chat-placeholder").classList.add("hidden");
+      document.getElementById("active-chat-view").classList.remove("hidden");
+
+      // On mobile, hide sidebar to reveal chat
+      document.getElementById("sidebar").classList.add("mobile-hidden");
+
+      // Reset messages container
+      messageIds.clear();
+      const chatContainer = document.getElementById("chat-container");
+      chatContainer.innerHTML = `<div class="messages-empty" id="chat-status">Loading conversation...</div>`;
+
+      // Load room metadata, members, messages, and WebSocket
+      try {
+        const roomRes = await fetch(`/api/rooms/${roomId}`, { headers: authHeaders });
+        if (!roomRes.ok) {
+          document.getElementById("room-name").textContent = "Room unavailable";
+          document.getElementById("chat-status").textContent = "Room not found or you don't have access.";
+          setConnectionStatus("disconnected", "Unavailable");
+          return;
+        }
+        const room = await roomRes.json();
+        document.getElementById("room-name").textContent = room.name;
+        document.getElementById("room-avatar").textContent = initials(room.name);
+        document.title = `${room.name} - Teamwork LLM`;
+
+        loadRoomMembers(roomId);
+        await fetchMessages(roomId);
+        connectWebSocket(roomId);
+      } catch (err) {
+        console.error("Error opening room:", err);
+      }
+    }
+
+    function renderRooms(rooms) {
+      const container = document.getElementById("rooms-container");
+      if (!rooms || rooms.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state" style="padding: 2rem 1rem;">
+            You don't have any rooms yet.<br/>Click <strong>+ New</strong> to create one.
+          </div>`;
+        return;
+      }
+
+      container.innerHTML = "";
+      rooms.forEach((r) => {
+        const item = document.createElement("div");
+        item.className = "room-item" + (r.id === currentRoomId ? " active" : "");
+        item.dataset.roomId = r.id;
+        item.innerHTML = `
+          <div class="avatar avatar-sm">${escapeHtml(initials(r.name))}</div>
+          <div class="list-item-body">
+            <div class="list-item-title">${escapeHtml(r.name)}</div>
+            <div class="list-item-sub">${escapeHtml(r.description || "No description")}</div>
+          </div>
+          <span class="tag">${escapeHtml(r.visibility || "public")}</span>
+        `;
+        item.addEventListener("click", () => {
+          selectRoom(r.id, true);
+        });
+        container.appendChild(item);
+      });
+    }
+
+    async function loadRooms() {
+      try {
+        const res = await fetch("/api/rooms", { headers: authHeaders });
+        if (!res.ok) return;
+        cachedRooms = await res.json();
+        renderFilteredRooms();
       } catch (err) {
         document.getElementById("rooms-container").innerHTML =
-          `<div class="list empty-state">Failed to load rooms.</div>`;
+          `<div class="empty-state">Failed to load rooms.</div>`;
       }
+    }
+
+    function renderFilteredRooms() {
+      const searchVal = document.getElementById("search-rooms-input").value.toLowerCase().trim();
+      const filtered = cachedRooms.filter((r) => {
+        return (
+          r.name.toLowerCase().includes(searchVal) ||
+          (r.description && r.description.toLowerCase().includes(searchVal))
+        );
+      });
+      renderRooms(filtered);
     }
 
     async function loadNotifications() {
@@ -100,11 +495,19 @@
           badge.classList.remove("hidden");
 
           list.innerHTML = notifs.map((n) => `
-            <a href="/rooms/${n.room_id}" class="notification-item">
+            <div class="notification-item" data-room-id="${n.room_id}">
               <div>Invited to <strong>${escapeHtml(n.room_name)}</strong></div>
               <div class="notification-sub">by ${escapeHtml(n.invited_by)}</div>
-            </a>
+            </div>
           `).join("");
+
+          list.querySelectorAll(".notification-item").forEach((item) => {
+            item.addEventListener("click", () => {
+              const rId = item.dataset.roomId;
+              document.getElementById("notif-menu").classList.remove("show");
+              selectRoom(rId, true);
+            });
+          });
         } else {
           badge.classList.add("hidden");
           list.innerHTML = `<div class="muted" style="font-size:0.85rem; text-align:center; padding:1rem 0;">No notifications</div>`;
@@ -114,88 +517,237 @@
       }
     }
 
-    function escapeHtml(text) {
-      const div = document.createElement("div");
-      div.textContent = text || "";
-      return div.innerHTML;
-    }
+    // Initialize application
+    async function initApp() {
+      try {
+        const meRes = await fetch("/api/me", { headers: authHeaders });
+        if (meRes.status === 401) {
+          localStorage.removeItem("access_token");
+          window.location.href = "/login";
+          return;
+        }
+        const me = await meRes.json();
+        currentUserId = me.id;
 
-    // Dropdown toggle
-    const notifBtn = document.getElementById("notif-btn");
-    const notifMenu = document.getElementById("notif-menu");
+        await loadRooms();
+        await loadNotifications();
 
-    notifBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      notifMenu.classList.toggle("show");
-    });
-
-    notifMenu.addEventListener("click", (e) => {
-      e.stopPropagation();
-    });
-
-    document.addEventListener("click", () => {
-      notifMenu.classList.remove("show");
-    });
-
-    function renderRooms(rooms) {
-      const container = document.getElementById("rooms-container");
-      if (!rooms || rooms.length === 0) {
-        container.innerHTML = `<div class="list empty-state">You don't have any rooms yet. Click "+ New Room" to create one.</div>`;
-        return;
+        // Check if URL specifies a room: /rooms/{room_id}
+        const pathParts = window.location.pathname.split("/").filter(Boolean);
+        if (pathParts[0] === "rooms" && pathParts[1]) {
+          await selectRoom(pathParts[1], false);
+        } else {
+          document.getElementById("active-chat-view").classList.add("hidden");
+          document.getElementById("empty-chat-placeholder").classList.remove("hidden");
+        }
+      } catch (err) {
+        console.error("App init error:", err);
       }
-
-      const list = document.createElement("div");
-      list.className = "list";
-
-      rooms.forEach((r) => {
-        const item = document.createElement("div");
-        item.className = "list-item";
-        item.innerHTML = `
-          <div class="avatar"></div>
-          <div class="list-item-body">
-            <div class="list-item-title"></div>
-            <div class="list-item-sub"></div>
-          </div>
-          <span class="tag"></span>
-        `;
-        item.querySelector(".avatar").textContent = initials(r.name);
-        item.querySelector(".list-item-title").textContent = r.name;
-        item.querySelector(".list-item-sub").textContent = r.description || "No description";
-        item.querySelector(".tag").textContent = r.visibility;
-        item.addEventListener("click", () => {
-          window.location.href = `/rooms/${r.id}`;
-        });
-        list.appendChild(item);
-      });
-
-      container.innerHTML = "";
-      container.appendChild(list);
     }
 
-    document.getElementById("toggle-create-btn").addEventListener("click", () => {
-      document.getElementById("create-room-box").classList.toggle("hidden");
+    // Search rooms filter
+    document.getElementById("search-rooms-input").addEventListener("input", () => {
+      renderFilteredRooms();
     });
+
+    // Mobile back button
+    document.getElementById("back-to-sidebar-btn").addEventListener("click", () => {
+      document.getElementById("sidebar").classList.remove("mobile-hidden");
+    });
+
+    // Browser back/forward navigation
+    window.addEventListener("popstate", () => {
+      const pathParts = window.location.pathname.split("/").filter(Boolean);
+      if (pathParts[0] === "rooms" && pathParts[1]) {
+        selectRoom(pathParts[1], false);
+      } else {
+        currentRoomId = null;
+        if (socket) {
+          socket.onclose = null;
+          socket.close();
+          socket = null;
+        }
+        document.querySelectorAll(".room-item").forEach((el) => el.classList.remove("active"));
+        document.getElementById("active-chat-view").classList.add("hidden");
+        document.getElementById("empty-chat-placeholder").classList.remove("hidden");
+        document.getElementById("sidebar").classList.remove("mobile-hidden");
+      }
+    });
+
+    // Create room controls
+    const toggleCreateBtn = document.getElementById("toggle-create-btn");
+    const placeholderCreateBtn = document.getElementById("placeholder-create-btn");
+    const cancelCreateBtn = document.getElementById("cancel-create-btn");
+    const createRoomBox = document.getElementById("create-room-box");
+    const roomNameInput = document.getElementById("room-name-input");
+    const roomDescInput = document.getElementById("room-desc-input");
+
+    function openCreateRoom() {
+      createRoomBox.classList.remove("hidden");
+      roomNameInput.focus();
+    }
+
+    function closeCreateRoom() {
+      createRoomBox.classList.add("hidden");
+      roomNameInput.value = "";
+      roomDescInput.value = "";
+    }
+
+    toggleCreateBtn.addEventListener("click", () => {
+      if (createRoomBox.classList.contains("hidden")) {
+        openCreateRoom();
+      } else {
+        closeCreateRoom();
+      }
+    });
+
+    placeholderCreateBtn.addEventListener("click", openCreateRoom);
+    cancelCreateBtn.addEventListener("click", closeCreateRoom);
 
     document.getElementById("create-room-form").addEventListener("submit", async (e) => {
       e.preventDefault();
-      const name = document.getElementById("room-name").value.trim();
-      const description = document.getElementById("room-desc").value.trim() || null;
+      const name = roomNameInput.value.trim();
+      const description = roomDescInput.value.trim() || null;
+      if (!name) return;
 
-      const res = await fetch("/api/rooms", {
-        method: "POST",
-        headers: authHeaders,
-        body: JSON.stringify({ name, description }),
-      });
+      const submitBtn = document.getElementById("submit-create-btn");
+      submitBtn.disabled = true;
 
-      if (res.ok) {
-        document.getElementById("room-name").value = "";
-        document.getElementById("room-desc").value = "";
-        document.getElementById("create-room-box").classList.add("hidden");
-        loadUserAndRooms();
+      try {
+        const res = await fetch("/api/rooms", {
+          method: "POST",
+          headers: authHeaders,
+          body: JSON.stringify({ name, description }),
+        });
+
+        if (res.ok) {
+          const newRoom = await res.json();
+          closeCreateRoom();
+          await loadRooms();
+          selectRoom(newRoom.id, true);
+        } else {
+          const err = await res.json().catch(() => ({}));
+          alert(err.detail || "Failed to create room.");
+        }
+      } catch (err) {
+        console.error("Create room error:", err);
+      } finally {
+        submitBtn.disabled = false;
       }
     });
 
-    loadUserAndRooms();
+    // Notifications dropdown
+    const notifBtn = document.getElementById("notif-btn");
+    const notifMenu = document.getElementById("notif-menu");
+    notifBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      membersMenu.classList.remove("show");
+      notifMenu.classList.toggle("show");
+    });
+    notifMenu.addEventListener("click", (e) => e.stopPropagation());
+
+    // Members & Invite dropdown
+    const membersBtn = document.getElementById("members-btn");
+    const membersMenu = document.getElementById("members-menu");
+    const inviteForm = document.getElementById("invite-form");
+    const inviteInput = document.getElementById("invite-input");
+    const inviteFeedback = document.getElementById("invite-feedback");
+    const sendInviteBtn = document.getElementById("send-invite-btn");
+
+    membersBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      notifMenu.classList.remove("show");
+      membersMenu.classList.toggle("show");
+      if (membersMenu.classList.contains("show") && currentRoomId) {
+        loadRoomMembers(currentRoomId);
+      }
+    });
+    membersMenu.addEventListener("click", (e) => e.stopPropagation());
+
+    document.addEventListener("click", () => {
+      notifMenu.classList.remove("show");
+      membersMenu.classList.remove("show");
+    });
+
+    inviteForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const identifier = inviteInput.value.trim();
+      if (!identifier || !currentRoomId) return;
+
+      sendInviteBtn.disabled = true;
+      inviteFeedback.style.display = "none";
+
+      try {
+        const res = await fetch(`/api/rooms/${currentRoomId}/invitations`, {
+          method: "POST",
+          headers: authHeaders,
+          body: JSON.stringify({ identifier }),
+        });
+
+        const data = await res.json();
+        if (res.ok) {
+          inviteFeedback.style.color = "var(--success)";
+          inviteFeedback.textContent = data.message || "Invitation sent!";
+          inviteFeedback.style.display = "block";
+          inviteInput.value = "";
+          await loadRoomMembers(currentRoomId);
+          setTimeout(() => {
+            inviteFeedback.style.display = "none";
+          }, 2200);
+        } else {
+          inviteFeedback.style.color = "var(--danger)";
+          inviteFeedback.textContent = data.detail || "Failed to invite user.";
+          inviteFeedback.style.display = "block";
+        }
+      } catch (err) {
+        inviteFeedback.style.color = "var(--danger)";
+        inviteFeedback.textContent = "Error sending invitation.";
+        inviteFeedback.style.display = "block";
+      } finally {
+        sendInviteBtn.disabled = false;
+      }
+    });
+
+    // Chat message submission
+    document.getElementById("chat-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const input = document.getElementById("message-input");
+      const sendBtn = document.getElementById("send-btn");
+      const content = input.value.trim();
+      if (!content || !currentRoomId) return;
+
+      input.value = "";
+      sendBtn.disabled = true;
+
+      if (socket && socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify({ content }));
+        sendBtn.disabled = false;
+        input.focus();
+      } else {
+        try {
+          const res = await fetch(`/api/rooms/${currentRoomId}/messages`, {
+            method: "POST",
+            headers: authHeaders,
+            body: JSON.stringify({ content }),
+          });
+
+          if (res.ok) {
+            const newMsg = await res.json();
+            appendMessage(newMsg);
+          } else {
+            const errData = await res.json().catch(() => ({}));
+            alert(errData.detail || "Failed to send message");
+          }
+        } catch (err) {
+          console.error("Failed to send message via HTTP fallback:", err);
+        } finally {
+          sendBtn.disabled = false;
+          input.focus();
+        }
+      }
+    });
+
+    initApp();
   </script>
 </body>
 </html>

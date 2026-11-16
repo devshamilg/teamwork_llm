@@ -1,3 +1,5 @@
+import asyncio
+import re
 import uuid
 from typing import Optional
 
@@ -25,8 +27,20 @@ from database.engine import async_session_maker, get_async_session
 from database.tables import Message, Room, RoomInvitation, RoomMember, User
 from schemas import InviteMember, MessageCreate, RoomCreate, UserUpdate
 from utils.connection_manager import manager
+from utils.ai import async_process_ai_mention
+from utils.ai import async_process_ai_mention
+
 
 router = APIRouter(prefix="/api", tags=["api"])
+
+
+def extract_ai_prompt(text: str) -> Optional[str]:
+    match = re.search(r"@ai\b", text, flags=re.IGNORECASE)
+    if not match:
+        return None
+    start, end = match.span()
+    query = (text[:start] + " " + text[end:]).strip().lstrip(":,! ").strip()
+    return query if query else "Hello! How can you help me?"
 
 
 async def get_current_user_ws(
@@ -173,7 +187,12 @@ async def invite_room_member(
         RoomMember.user_id == target_user.id,
     )
     existing_mem_res = await session.execute(existing_mem_stmt)
-    if existing_mem_res.scalars().first():
+    existing_inv_stmt = select(RoomInvitation).where(
+        RoomInvitation.room_id == room_id,
+        RoomInvitation.user_id == target_user.id,
+    )
+    existing_inv_res = await session.execute(existing_inv_stmt)
+    if existing_mem_res.scalars().first() or existing_inv_res.scalars().first():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"{target_user.display_name} is already a member of this room.",
@@ -199,6 +218,61 @@ async def invite_room_member(
         "username": target_user.username,
         "display_name": target_user.display_name,
     }
+
+
+@router.get("/rooms/{room_id}/members")
+async def get_room_members(
+    room_id: uuid.UUID,
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_async_session),
+):
+    room = await get_room_with_access(room_id, user.id, session)
+
+    members_map: dict[str, dict] = {}
+
+    creator_res = await session.execute(select(User).where(User.id == room.created_by))
+    creator = creator_res.scalars().first()
+    if creator:
+        members_map[str(creator.id)] = {
+            "id": str(creator.id),
+            "username": creator.username,
+            "display_name": creator.display_name,
+            "role": "owner",
+        }
+
+    mem_stmt = (
+        select(RoomMember)
+        .options(joinedload(RoomMember.user))
+        .where(RoomMember.room_id == room_id)
+        .order_by(RoomMember.joined_at.asc())
+    )
+    mem_res = await session.execute(mem_stmt)
+    for rm in mem_res.scalars().all():
+        if rm.user and str(rm.user.id) not in members_map:
+            members_map[str(rm.user.id)] = {
+                "id": str(rm.user.id),
+                "username": rm.user.username,
+                "display_name": rm.user.display_name,
+                "role": "owner" if rm.user.id == room.created_by else rm.role,
+            }
+
+    inv_stmt = (
+        select(RoomInvitation)
+        .options(joinedload(RoomInvitation.user))
+        .where(RoomInvitation.room_id == room_id)
+        .order_by(RoomInvitation.created_at.asc())
+    )
+    inv_res = await session.execute(inv_stmt)
+    for inv in inv_res.scalars().all():
+        if inv.user and str(inv.user.id) not in members_map:
+            members_map[str(inv.user.id)] = {
+                "id": str(inv.user.id),
+                "username": inv.user.username,
+                "display_name": inv.user.display_name,
+                "role": "owner" if inv.user.id == room.created_by else inv.role,
+            }
+
+    return list(members_map.values())
 
 
 @router.get("/rooms")
@@ -364,14 +438,36 @@ async def create_room_message(
         "created_at": message.created_at.isoformat() if message.created_at else None,
     }
     await manager.broadcast(room_id, response_payload)
+    ai_query = extract_ai_prompt(clean_content)
+    if ai_query is not None:
+        asyncio.create_task(async_process_ai_mention(room_id, ai_query, message.id))
     return response_payload
+
+
+@router.post("/rooms/{room_id}/summarize")
+async def summarize_room_messages(
+    room_id: uuid.UUID,
+    user: User = Depends(current_active_user),
+    session: AsyncSession = Depends(get_async_session),
+):
+    await get_room_with_access(room_id, user.id, session)
+    stmt = (
+        select(Message)
+        .options(joinedload(Message.sender))
+        .where(Message.room_id == room_id, Message.is_deleted.is_(False))
+        .order_by(Message.created_at.asc())
+    )
+    result = await session.execute(stmt)
+    messages = list(result.scalars().all())
+    summary = await async_summarize(messages, room_id=room_id)
+    return {"summary": summary}
 
 
 @router.websocket("/ws/rooms/{room_id}")
 async def room_websocket(
     websocket: WebSocket,
     room_id: uuid.UUID,
-    current_user: User = Depends(get_current_user_ws),
+    current_user: User = Depends(get_current_user_ws)
 ):
     # Verify user access to the room
     async with async_session_maker() as session:
@@ -429,9 +525,14 @@ async def room_websocket(
                 }
 
             await manager.broadcast(room_id, payload)
+
+            ai_query = extract_ai_prompt(content)
+            if ai_query is not None:
+                asyncio.create_task(async_process_ai_mention(room_id, ai_query, message.id))
     except WebSocketDisconnect:
         manager.disconnect(room_id, websocket)
-    except Exception:
+    except Exception as exc:
+        print(f"Error in room_websocket: {exc}")
         manager.disconnect(room_id, websocket)
 
 

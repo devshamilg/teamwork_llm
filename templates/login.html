@@ -36,7 +36,7 @@
 
   <script>
     if (localStorage.getItem("access_token")) {
-      window.location.href = "/home";
+      window.location.href = "/chat";
     }
 
     const form = document.getElementById("login-form");
@@ -70,7 +70,7 @@
 
         const data = await res.json();
         localStorage.setItem("access_token", data.access_token);
-        window.location.href = "/home";
+        window.location.href = "/chat";
       } catch (err) {
         errorBox.textContent = err.message;
         errorBox.style.display = "block";
